@@ -2,87 +2,133 @@
 
 The contribution is not detection. It is the response after detection: a sanction
 and rehabilitation lifecycle bound to an unforgeable TPM hardware identity, with
-the response policy and reversibility made a function of the hardware-trust tier.
+the response policy and reversibility made a function of the hardware-trust tier —
+and a Solidity registry that **enforces** the trust lifecycle on chain, so the ban
+ledger is verifiable by a party that does not trust the server operator.
 
 ## Objectives
-- O1 Sybil resistance: one TPM EK equals one identity, proven by credential activation.
-- O2 Anti-whitewashing: a ban binds to the EK hash, so it cannot be shed by re-registering.
-- O3 Quantified trust: reputation is deterministic; attacker cost per tier is measured.
-- O4 Aggregator-agnostic: trust outputs dict[str, float] weights for FedAvg, Krum, TrimmedMean.
+- **O1 Sybil resistance**: one TPM EK equals one identity, proven by credential activation.
+- **O2 Anti-whitewashing**: a ban binds to the EK hash, so it cannot be shed by
+  re-registering — and it survives server restart (reconciliation from chain events).
+- **O3 Quantified trust**: reputation is deterministic; attacker cost per tier is measured.
+- **O4 Aggregator-agnostic**: trust outputs `dict[str, float]` weights for FedAvg,
+  Krum, TrimmedMean from one unmodified weight dictionary.
 
-## Trust tiers (set at enrollment)
-- Tier 1 HARDWARE: EK certificate chains to a manufacturer CA AND credential activation
-  passes. Weight cap 1.0, two MAJOR strikes before probation, rehabilitation allowed.
-- Tier 2 TPM_RESIDENT: activation passes, no verifiable cert. Weight cap 0.5, one strike,
-  no rehabilitation.
-- Tier 3 SOFTWARE / TOFU: no hardware proof. Weight cap 0.1, one strike.
+## Trust model (v3 engine)
 
-Core idea: identity replacement cost drives policy. Expensive identities (Tier 1) get
-patience and a path back; free identities get low caps and instant bans.
+Trust is **identity-blind**: every tier starts at 0.5 under the same uniform
+Beta(1,1) prior and the same dynamics (θ=0.4, τ=0.6, γ=FORGET=0.90, ceiling
+0.8333). Behaviour determines trust; hardware determines consequences. Tier is
+set at enrollment and enters at exactly three places, none of them the score:
+
+| Tier | Meaning | Weight cap | Rehabilitation |
+|---|---|---|---|
+| 1 HARDWARE | EK cert chains to a manufacturer CA AND credential activation passes | 1.0 | probation allowed |
+| 2 TPM_RESIDENT | activation passes, no verifiable cert | 0.5 | ban only |
+| 3 SOFTWARE / TOFU | no hardware proof | 0.1 | ban only |
+
+Core idea: identity replacement cost drives policy. Expensive identities (Tier 1)
+get patience and a path back; free identities get low caps and instant bans.
+Hardening: bounded recency (M1), earned forgetting (M2), sustained-MAJOR
+escalation (M3), a cold-start evidence gate, and due-process probation (D5).
+
+## On-chain layer (optional, off by default)
+
+`contracts/src/DLTFRegistry.sol` (Foundry project in `contracts/`) recomputes
+reputation from submitted severities — there is no state-submission API — and
+rejects illegal transitions by EVM revert: `BanToActive`, `TierMutation`,
+`DuplicateRound`/`StaleRound`, `EkAlreadyRegistered`, `UnauthorizedWriter`.
+Only `ek_hmac = HMAC(federation_key, "DLTF-EKv1|" + ek_hash)` goes on chain;
+raw EK hashes never leave the host. A client-side **commitment layer**
+(`keccak256` of the canonical gradient, EIP-712 batch signing, TPM-bound
+wallets) prevents the server from fabricating an update and attributing it.
+September 2026 added local transaction signing, an async write queue, a
+19-check testnet preflight, liveness/economics experiments, and a 4-validator
+Besu QBFT stage (`qbft/`, partially executed — see MASTER_CONTEXT §15).
 
 ## Real-hardware status (AMD fTPM, verified June 2026)
+
 The dev laptop (Ryzen 5 5600X, AMD fTPM) DOES expose a fetchable EK certificate
-(issuer "Advanced Micro Devices, CN = PRG-RN") that chain-verifies through PRG-RN to
-the self-signed AMDTPM root. So this machine reaches a REAL Tier 1, not a simulated
-one. Two findings came out of bringing this up:
+(issuer "Advanced Micro Devices, CN = PRG-RN") that chain-verifies through PRG-RN
+to the self-signed AMDTPM root. So this machine reaches a REAL Tier 1, not a
+simulated one. Two findings came out of bringing this up:
 - Not all AMD fTPMs expose a cert; it depends on board/BIOS provisioning. The tier
   model degrades correctly to Tier 2 when absent.
 - AMD EK certs are technically malformed (a non-spec DEFAULT encoding on an extension
   `critical` field). Python's strict parser rejects them; openssl accepts them.
-  verify_ek_certificate falls back to openssl for such certs, so both paths work.
+  `verify_ek_certificate` falls back to `openssl verify -partial_chain`, so both
+  paths work. The CA bundle must contain BOTH intermediates (PRG-RN and PRG-SSP).
+
+Two physical clients plus a server run over a Tailscale mesh; both enroll as
+real Tier 1 with distinct EK hashes. Detection demos need a third agent
+(n ≥ 3 for median-based stages — measured, see docs/REAL_MODE_RUNBOOK.md §0).
 
 ## Layout
-- config.py        topology and run mode. The single local-to-real switch.
-- run_server.py    server-PC runner: enrolls remote agents, runs rounds, writes audit.
-- tpm/             Layer 1. EK + AIK, EK-cert verification, MakeCredential/ActivateCredential.
-- trust/           Detection (filter.py) and the contribution (reputation.py / reputation_beta.py, probation.py).
-- fl/              CNN, non-IID data, client (compute only), server (enrollment + rounds), aggregators.
-- net/             Transport seam. ClientHandle implementations and the client HTTP agent.
-- audit/           Local append-only HMAC-signed hash chain for enrollments, bans, rounds.
-- eval/            Scenarios, multi-seed CSV runner, figures. Produces the Chapter 4 numbers.
-- tests/           End-to-end pipeline self-test.
 
-Run everything from the project root with PYTHONPATH set, so top-level imports resolve:
-`PYTHONPATH=. python3 <module>`.
-
-## Quick start (one PC, dev mode)
 ```
-PYTHONPATH=. python3 tests/test_pipeline.py
-PYTHONPATH=. python3 -m eval.run_experiments --exp all --seeds 5 --rounds 30 --out results --check
-PYTHONPATH=. python3 -m eval.plot_results --results results
-```
-
-## Reputation engines (ablation)
-Two engines behind one interface. Additive (default) uses fixed deltas; beta uses a
-Bayesian posterior with hardware-informed priors.
-```
-from trust.reputation import ReputationEngine          # default
-from trust.reputation_beta import BetaReputationEngine
-server = FederatedServer(params, reputation_engine=BetaReputationEngine())
+config.py        topology + CHAIN block (env-overridable). The local-to-real switch.
+run_local.py     SIM runner: one PC, in-process federation (--chain, --restart-at,
+                 --rejoin-as, --tier1, --require-commit, --attack profiles)
+run_server.py    REAL runner: enrolls remote agents, runs rounds, writes audit
+tpm/             Layer 1. EK + AK, EK-cert verification, MakeCredential/ActivateCredential,
+                 wallet-binding signatures
+trust/           reputation.py (v3 engine, black box), probation.py, filter.py
+                 legacy/ — v1 push-model chain attempt (superseded, kept as history)
+fl/              CNN (409k params), non-IID MNIST, client, server, aggregators
+net/             transport seam (handles.py) + per-client HTTP agent (agent.py)
+audit/           local append-only HMAC-signed hash chain
+chain/           on-chain layer: enforcement adapter, mock/evm backends, commitment,
+                 signing, async writer, deploy, reconcile, verifier, preflight
+contracts/       Foundry project: src/DLTFRegistry.sol + Rules/Commit test suites
+qbft/            4-validator Besu QBFT setup + experiments 2a–2d
+eval/            scenarios, run_experiments (Ch.4), chain_eval (Ch.5), make_figures,
+                 exp_* harnesses (liveness, economics, gas, aggregator, tiers, ...)
+tests/           test_pipeline.py, test_chain_integration.py
+tools/           prove_it_works.py — 41 falsification checks with negative controls
+docs/            consolidated documentation (start at docs/INDEX.md)
+results/         generated outputs (gitignored); data/ datasets (gitignored)
 ```
 
-## Multi-PC deployment
-1. Copy dltf/ to every machine; edit config.py identically (labels + endpoints).
-2. Each client PC: `PYTHONPATH=. python3 -m net.agent --label clientN --port 8470 [--stub]`.
-3. Server PC: `PYTHONPATH=. python3 run_server.py --rounds 10`.
-Bring-up order: mock backend + --stub (network test), then drop --stub (real MNIST),
-then tpm_backend="real" on TPM-equipped boxes.
+Run everything from the project root: `PYTHONPATH=. python3 <module>`.
 
-Over the internet (not one LAN): install Tailscale on every machine, `sudo tailscale up`
-under one account, put the 100.x.y.z addresses in config.py endpoints. No port
-forwarding, no code change. Bonus: traffic is WireGuard-encrypted, mitigating the
-plain-HTTP limitation.
+## Quick start (one PC, no hardware)
 
-## Checking a machine's tier
+```bash
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt -r requirements-chain.txt
+
+PYTHONPATH=. python3 tests/test_pipeline.py            # ✓ PIPELINE GREEN
+PYTHONPATH=. python3 tools/prove_it_works.py           # 41 checks + controls
+PYTHONPATH=. python3 run_local.py --clients 6 --attackers 2 --rounds 20 \
+    --chain mock --restart-at 12 --rejoin-as newclient # ban → restart → rebuild → whitewash
+cd contracts && forge test -vv                         # Solidity suites
 ```
-PYTHONPATH=. python3 -m tpm.check_ek_cert                                  # live fetch
-PYTHONPATH=. python3 -m tpm.check_ek_cert --ek-cert ek.crt --ca-bundle tpm/ca/amd_ftpm_ca.pem
-```
-See tpm/FETCH_EK_CERT.md for the full step-by-step of fetching and verifying an EK
-certificate on a new AMD client.
+
+Full setup (venv ABI trap, solc 0.8.24 pin, TPM certs, Tailscale, real chain):
+**SETUP_GUIDE.md**.
+
+## Documentation map
+
+| Doc | What it is |
+|---|---|
+| **MASTER_CONTEXT.md** | authoritative system state: engine constants, chain layer, Sept-2026 deployment phase |
+| **RUNBOOK.md** | newest engineering record: local signing, correctness fixes, liveness/economics results |
+| **CLAUDE.md** | session handoff + ordered next steps (Anvil → testnet → QBFT → paper) |
+| **SETUP_GUIDE.md** | install and run, in the order things break |
+| **FETCH_EK_CERT.md** | per-machine AMD EK certificate fetch + chain verification |
+| **REFERENCES.md** | annotated bibliography + novelty vs prior work |
+| **docs/INDEX.md** | index of the consolidated docs (thesis context, testing, results, demos) |
+| **qbft/README.md** | what the 4-validator stage proves and how to run it |
+| **eval/RUNBOOK.md** | paper-evidence completion plan |
+| **docs/history/** | retired documents, labeled (v2.1 context, executed prompts, LaTeX changelogs, v1 guide) |
 
 ## Honest scope
+
 The hardware-rooted guarantee holds only where a verifiable EK certificate exists
 (Tier 1). Without it, whitewashing is hardware-cost-bound, not impossible. Tier 1
-soundness depends on the CA allow-list: trusting a cloud vTPM CA admits real-but-rented
-hardware identities, bounded by rental cost. Stated as results and limitations, not hidden.
+soundness depends on the CA allow-list: trusting a cloud vTPM CA admits
+real-but-rented hardware identities, bounded by rental cost. Six to fifty clients
+is not deployment scale; two physical TPMs is not a hardware study; a stealthy
+directed-deviation attack from a legitimately enrolled device still defeats the
+design; and four Docker validators on one host are consensus in mechanism, not
+in threat model. Stated as results and limitations, not hidden.

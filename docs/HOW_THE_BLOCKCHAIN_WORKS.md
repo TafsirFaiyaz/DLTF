@@ -490,3 +490,32 @@ correctness.
 ones. A server can decline to report a classification. A third party comparing
 rounds-anchored against rounds-run detects it, but nothing prevents it. Put that
 in Chapter 6.
+
+---
+
+## Addendum (2026-11-17): what the September phase changed
+
+Two framing claims in this document are now superseded; the design reasoning
+above remains valid.
+
+1. **"Not deployed to a public chain / one writer, many verifiers."** A
+   4-validator Besu QBFT network (`qbft/`) ran on 2026-09-11: enforcement by
+   consensus was demonstrated (`UnauthorizedWriter` refused by 2f+1
+   agreement, not by one operator's node). Public-testnet deployment is the
+   next pending step (Sepolia recommended). The ceiling still holds: four
+   Docker validators on one host are consensus in mechanism, not in threat
+   model.
+2. **The unqualified N24 "never on the critical path."** Measured: synchronous
+   writes ARE on the wall-clock critical path (injected stall: ~5× slower
+   rounds; real QBFT: first stalled round ~189 s). `chain/async_writer.py`
+   removes ledger work from the round (~115–136 ms healthy rounds on QBFT)
+   but carries a backlog INTO an outage — writes issued while healthy can be
+   destroyed (an ENROLL was lost at queue depth 17). Structural survival
+   holds; quote the split verdict with the collateral.
+
+Also new since this document: local transaction signing (`chain/signer.py` —
+public RPCs do not implement `eth_sendTransaction`), the resend/double-apply
+fix (same-nonce replacement), revert-name recovery from status-0 receipts,
+chunked `eth_getLogs`, and `chain/testnet_preflight.py` (19 checks; one open
+POA `head_hash` bug on Besu). Full record: root `RUNBOOK.md`,
+`MASTER_CONTEXT.md` §15.

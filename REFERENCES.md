@@ -27,7 +27,9 @@ B. REPUTATION AND TRUST MODELS  (Chapter: Trust layer, reputation*.py)
 
 [4] A. Josang and R. Ismail, "The Beta Reputation System," in Proc. 15th Bled
     Electronic Commerce Conference, 2002.
-    -> Foundation of trust/reputation_beta.py (Beta posterior, forgetting factor).
+    -> Foundation of the v3 engine's subjective-logic form (Beta posterior,
+        probability expectation E = b + a·u). NOTE: the old additive/beta
+        two-engine ablation is retired; there is ONE engine (trust/reputation.py).
 
 [5] S. D. Kamvar, M. T. Schlosser, and H. Garcia-Molina, "The EigenTrust
     Algorithm for Reputation Management in P2P Networks," in Proc. 12th Int. World
@@ -71,7 +73,9 @@ C. DESIGN PRINCIPLES / THEORY  (Chapter: Motivation, constants rationale)
 
 [13] P. Slovic, "Perceived Risk, Trust, and Democracy," Risk Analysis, vol. 13,
      no. 6, pp. 675-682, 1993.
-     -> Trust asymmetry principle (justifies the 5:1 damage-to-repair ratio).
+     -> Trust-asymmetry DIRECTION only. Does NOT justify a rate ratio: v3 has
+        FORGET = GAMMA = 0.90 (one decay primitive); the asymmetry comes from
+        the FORGIVE_AFTER gate, not a 5:1 damage-to-repair ratio (retired).
 
 [14] S. Buchegger and J.-Y. Le Boudec, "Performance Analysis of the CONFIDANT
      Protocol," in Proc. ACM MobiHoc, 2002.
@@ -165,3 +169,92 @@ NOTES FOR THE WRITE-UP
 - [4] Josang & Ismail backs the beta engine; [11]-[14] back the constants rationale.
 - Verify [24] Co-Utility carefully; it is used as a direct novelty contrast, so the
   exact paper and claim must be correct.
+
+====================================================================
+G. MISSING / TO VERIFY (flagged by MASTER_CONTEXT §9 — add before submission)
+====================================================================
+Do NOT fabricate entries: look each up, verify venue/year/pages, then add.
+
+- Wang 2022 — TPM + blockchain oracle FL. Uses TPM for update INTEGRITY, not
+  persistent identity binding; DLTF binds identity so bans survive re-join.
+- ZTA-FL — arXiv:2512.23809 (Dec 2025). CLOSEST COMPETING WORK. Name it, state
+  exactly what it does, identify the precise gap; hedge novelty with "to our
+  knowledge".
+- Douceur 2002 — "The Sybil Attack". O1 foundation.
+- Theil 1950 / Sen 1968 — slope estimators (SLOPE_ESTIMATOR discussion).
+- TrustFed (ur Rehman et al., IEEE T-II 2021) — related trust-in-FL framework.
+- Sun 2008 / Labraoui 2015 — cited by the parameter justification report
+  (docs/history/); reconcile with [10] Sun 2006.
+- Kang 2019 VENUE CONFLICT: [21] says IEEE IoT-J 6(6); the parameter report
+  cites IEEE TVT 68(3), arXiv:1809.08387. Verify which is correct.
+- [24] Domingo-Ferrer — still marked VERIFY.
+
+====================================================================
+H. NOVELTY AND PRIOR WORK (merged from contributions_and_prior_work.md,
+   corrected to v3 — 2026-11-17)
+====================================================================
+
+## Derived from prior work
+
+**Hardware identity machinery.** The enrollment protocol implements standard
+TPM 2.0 mechanisms defined by the Trusted Computing Group: the Endorsement Key
+(EK) as a device-bound identity, EK certificates as manufacturer-issued proof
+of genuine silicon, and the MakeCredential/ActivateCredential exchange as proof
+that a client holds an EK inside a real TPM. None of this cryptography is ours;
+we apply it.
+
+**Detection.** The gradient filter composes four established techniques: norm
+clipping against the median (scaling attacks), cosine deviation from a robust
+median reference (targeted poisoning, in the spirit of Krum [16]), sustained
+pairwise-similarity detection of colluding clients (a simplified FoolsGold-style
+variant [18]), and temporal self-consistency for sleeper agents. Detection is
+deliberately not claimed as a contribution.
+
+**Reputation structure.** The score-threshold-status pattern follows P2P trust
+systems (EigenTrust [5]; PeerTrust [6]) and reputation-weighted federated
+aggregation (Kang [21]). Three design principles are imported: graduated
+sanctions (Ostrom [12]), asymmetric trust dynamics — trust lost faster than
+regained (Slovic [13], DIRECTION only; CONFIDANT [14]) — and the result that
+sanctions are meaningless when pseudonyms are free (Friedman & Resnick [11]),
+the theoretical backbone of this work.
+
+**Learning substrate.** FedAvg [15], Krum [16], trimmed-mean [17], a standard
+CNN on MNIST [30], and conventional non-IID partitioning are textbook components.
+
+## Novel in this work (to our knowledge — ZTA-FL is the closest prior work)
+
+1. **Tier-coupled sanction policy.** Existing reputation systems apply one
+   policy to all clients. DLTF indexes policy on the measured replacement cost
+   of the client's identity (hardware-certified, TPM-resident, software).
+   **v3 correction:** the tier couples the weight CAP and REHABILITATION
+   eligibility only — strikes/thresholds are uniform across tiers (the score
+   is identity-blind). The old "entire policy table incl. strikes" phrasing
+   overstates current tier-coupling.
+2. **Hardware-persistent negative reputation.** Bans bind to the EK hash, so a
+   banned device is recognized at re-enrollment regardless of its claimed name
+   — and, with the chain layer, bans persist across SERVER RESTART
+   (reconciliation from chain events, N23). Prior systems can only make good
+   reputation slow to earn; ours makes bad reputation impossible to shed
+   without purchasing new certified hardware: whitewashing becomes
+   hardware-cost-bound, not free.
+3. **A rehabilitation lifecycle.** Sanctioned Tier-1 devices enter probation in
+   which only their own updates train an isolated shadow model; reinstatement
+   requires a positive accuracy slope over an HMAC-randomized window, with a
+   one-shot extension and permanent ban otherwise. "Recovery" in the FL
+   literature means rolling back the model ([23] FedRecover — orthogonal);
+   client rehabilitation does not previously exist, and it is only safe
+   because of contribution 2.
+4. **Quantified attacker cost.** v3 measurements (RESULTS_EXPLAINED §4):
+   per-identity influence 0.462 weight-rounds at Tier 1 (cost: a physical TPM)
+   vs 0.201 at Tier 2 and 0.040 at Tier 3 (free identities); the defence costs
+   nothing in the attack-free case (0.691 vs 0.691). [The old ~0.91/~0.02
+   figures were v2.1-era and are retired.]
+5. **Verifiable enforcement (chain layer).** The ban ledger is checkable by a
+   party that does not trust the server: the contract REJECTS illegal
+   transitions by EVM revert (not merely records them), and an independent
+   verifier catches silent state tampering (TAMPER-2). A commitment layer
+   prevents the server from fabricating updates attributed to clients.
+
+The contribution is therefore a systems composition: known identity primitives
+and known detectors, joined by a novel sanction-and-rehabilitation policy rooted
+in hardware identity cost, made durable and independently verifiable on chain.

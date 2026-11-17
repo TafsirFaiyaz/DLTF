@@ -3,6 +3,16 @@
 Paste this as the first message of a new chat, with the attachments listed in
 §0. Everything below is the state at the end of the previous session.
 
+> **STATUS UPDATE (2026-11-17).** (1) The repo is now on GitHub
+> (TafsirFaiyaz/DLTF) and was consolidated: v1 chain code moved to
+> `trust/legacy/`, the canonical contract is `contracts/src/DLTFRegistry.sol`
+> (flat copies in `chain/` removed), docs merged (see `docs/INDEX.md`).
+> (2) The QBFT stage was PARTIALLY EXECUTED on 2026-09-11: 2b manual-stall
+> liveness completed twice; 2c preflight 18/19 — the one failure is
+> `head_hash()` on Besu POA `extraData` (needs `geth_poa_middleware` in
+> `chain/evm.py`). Fix that first. Details: `RUNBOOK.md` §11,
+> `MASTER_CONTEXT.md` §15.6, `qbft/README.md` status banner.
+
 ---
 
 ## 0. Files to attach
@@ -12,11 +22,11 @@ context budget:**
 
 | File | Why |
 |---|---|
-| `all_files.zip` (the whole repo) | Everything. If you can attach one thing, attach this. |
+| the whole repo (git clone or a fresh zip) | Everything. If you can attach one thing, attach this. |
 | `dltf_nsyss.tex` | The paper. Every change has to be justified against it. |
-| `RUNBOOK.md` | What changed last session and why |
-| `qbft/README.md` | The next phase, and what it proves |
-| `liveness_summary.txt` | The one new experimental result |
+| `RUNBOOK.md` | What changed last session and why (§11: the QBFT runs) |
+| `qbft/README.md` | The next phase, and what it proves (status banner: what already ran) |
+| `liveness_summary.txt` | The one new experimental result (in `results/chain/`) |
 
 **If you cannot attach the zip**, attach these individually. The repo layout is
 in §2; run everything from the repo root.
@@ -36,14 +46,14 @@ config.py                    MOD  env overrides for rpc/network/deploy block
 eval/run_local.py            MOD  --rpc, --network, --async-chain
 eval/exp_liveness.py         NEW  experiment 2b
 eval/exp_economics.py        NEW  phase 4
-trust/deploy_chain.py        MOD  now refuses to run (deploys the WRONG contract)
-qbft/*                       NEW  4-validator Besu setup, UNTESTED
+trust/legacy/deploy_chain.py MOD  now refuses to run (deploys the WRONG contract)
+qbft/*                       NEW  4-validator Besu setup (ran 2026-09-11, see banner)
 ```
 
 Needed for context but unchanged:
 
 ```
-chain/DLTFRegistry.sol       the contract — attach it, several claims depend on it
+contracts/src/DLTFRegistry.sol the contract — attach it, several claims depend on it
 chain/backend.py             Backend interface, Reason enum
 chain/commit.py              CommitMockBackend, SigningCommitAgent, grad_hash
 chain/mock.py                MockBackend (the parity reference)
@@ -100,14 +110,15 @@ detection is made durable, so exclusion costs the excluded party a certified
 TPM.
 
 ```
-chain/     DLTFRegistry.sol, evm.py, mock.py, registry.py, reconcile.py,
-           commit.py, signer.py, async_writer.py, wiring.py, deploy.py
+chain/     evm.py, mock.py, registry.py, reconcile.py, commit.py, signer.py,
+           async_writer.py, wiring.py, deploy.py, testnet_preflight.py
+contracts/ src/DLTFRegistry.sol + Foundry test suites (canonical contract home)
 fl/        server.py client.py aggregator.py model.py dataset.py
-trust/     reputation.py probation.py filter.py     (+ legacy deploy_chain.py)
+trust/     reputation.py probation.py filter.py  (+ legacy/ — v1, do not use)
 tpm/       common.py client.py
 audit/     hashchain.py
 eval/      chain_eval.py run_local.py exp_*.py
-qbft/      4-validator Besu setup (new, untested)
+qbft/      4-validator Besu setup (partially executed 2026-09-11)
 ```
 
 Run from the repo root as `PYTHONPATH=. python3 -m <module>`.
@@ -150,7 +161,7 @@ months while local signing did not exist.
 - **No local signing existed.** `_send` used `eth_sendTransaction`, which only
   Anvil, Hardhat and eth-tester implement. Every write on a public RPC would
   have failed, and failed misleadingly as `node unreachable`.
-- **`trust/deploy_chain.py --mode testnet` deploys the WRONG CONTRACT** —
+- **`trust/legacy/deploy_chain.py --mode testnet` deploys the WRONG CONTRACT** —
   `ReputationRegistry.sol`, not `DLTFRegistry.sol`. Different solc, no
   `--via-ir`, no custom errors, no commitment layer. The old `DEPLOYMENT.md`
   pointed at it. It now refuses to run.
@@ -290,8 +301,10 @@ claim the reorg null result from Sepolia — it has probabilistic finality and
 
 ### Step 3 — Four-validator QBFT (2–3 days). THE ONE THAT MATTERS.
 
-See `qbft/README.md`. **The files there are untested** — no Docker or Besu was
-available last session.
+See `qbft/README.md`. **The files ran on 2026-09-11** (2b liveness twice,
+2c preflight 18/19) — but `head_hash()` fails on Besu POA `extraData`; inject
+`geth_poa_middleware` in `chain/evm.py` and re-run preflight before anything
+else. 2a and 2d are still unrun.
 
 Run `qbft/verify.sh` before any experiment. Two failure modes both look like
 success: four containers with only one validator in the set (a single-validator

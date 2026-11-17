@@ -21,7 +21,8 @@ why they passed for months while local signing did not exist.
 | `eval/exp_economics.py` | Phase 4: the gas model in currency at a stated price and date |
 
 **Changed**: `chain/evm.py`, `chain/deploy.py`, `chain/registry.py`,
-`chain/wiring.py`, `config.py`, `eval/run_local.py`, `trust/deploy_chain.py`.
+`chain/wiring.py`, `config.py`, `eval/run_local.py`, `trust/deploy_chain.py`
+(moved to `trust/legacy/` in the 2026-11-17 cleanup).
 
 ---
 
@@ -36,7 +37,7 @@ times, and reported as `node unreachable` about a node answering every read.
 `DLTF_CHAIN_PRIVKEY` switches it on. Without a key, `wiring.py` now prints an
 explicit warning rather than letting you discover it on chain.
 
-**The wrong contract.** `trust/deploy_chain.py --mode testnet` compiles
+**The wrong contract.** `trust/legacy/deploy_chain.py --mode testnet` compiles
 `ReputationRegistry.sol` — solc 0.8.20, no `--via-ir`, no-arg constructor, no
 custom errors, no commitment layer. It is not `DLTFRegistry.sol`. Following
 `DEPLOYMENT.md`'s Phase 1 would have put the wrong bytecode on Amoy and spent
@@ -246,11 +247,14 @@ PYTHONPATH=. python3 -m eval.exp_liveness --rpc http://127.0.0.1:8545 \
     --address 0x... --clients 6 --rounds 12
 
 # 2. public testnet
+# NOTE: CLAUDE.md §6 Step 2 recommends Sepolia over Amoy (Amoy rate-limits
+# aggressively; 25 gwei minimum priority fee). Commands below show Amoy as
+# originally run; substitute sepolia + its RPC if following the recommendation.
 export DLTF_CHAIN_PRIVKEY=0x<funded TEST key>     # never a real key
 PYTHONPATH=. python3 -m chain.deploy --network amoy \
     --rpc-url https://rpc-amoy.polygon.technology
 # note the printed DLTF_DEPLOY_BLOCK — every eth_getLogs is bounded by it
-forge verify-contract <address> chain/DLTFRegistry.sol:DLTFRegistry \
+forge verify-contract <address> contracts/src/DLTFRegistry.sol:DLTFRegistry \
     --chain amoy --watch
 
 export DLTF_CHAIN=node DLTF_CHAIN_RPC=https://rpc-amoy.polygon.technology
@@ -283,3 +287,27 @@ and the liveness claim has a real result. None of that touches the rest:
 - And now: the wall-clock cost of a synchronous ledger write is a property of
   the implementation you evaluated. If you report the async numbers, say the
   async writer is new, and report the backlog collateral beside them.
+
+---
+
+## 11. Addendum — the QBFT runs of 2026-09-11 (added 2026-11-17)
+
+After this runbook was written, the 4-validator Besu network ran. From the
+archived logs (full detail in `MASTER_CONTEXT.md` §15.6):
+
+- **2b liveness, `--manual-stall`, real quorum loss** (stop besu-3+besu-4),
+  completed twice. Sync: healthy ~14.4 s/round; first stalled round 188.9 s
+  (full poll timeout — the injected-stall numbers above were indeed
+  optimistic); later stalled rounds ~14–16 s (the `_reads_down` latch);
+  restored ~14.4 s. Async: healthy ~115–136 ms/round. After restore: 6
+  devices rebuilt from 78 events, 0 discrepancies.
+- **2c preflight, writer + non-writer keys: 18 passed, 1 failed.**
+  `UnauthorizedWriter` refused by consensus; deploy gas 2,085,425 reproduced
+  exactly through the signed path; `commitBatch(4)` = 168,069;
+  `classifySigned` = 46,613; forged commitment rejected atomically.
+- **Open bug (the 1 failure):** `head_hash()` raises `ExtraDataLengthError`
+  on Besu — POA `extraData` is 327 bytes; web3 needs `geth_poa_middleware`
+  injected in `chain/evm.py`. Fix before re-running preflight or spending
+  faucet funds.
+- 2a (confirmation latency) and 2d (reorg null result): no archived logs —
+  treat as not yet run.

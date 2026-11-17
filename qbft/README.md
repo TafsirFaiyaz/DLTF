@@ -1,5 +1,18 @@
 # Four-validator QBFT: what it proves and how to run it
 
+> **STATUS UPDATE (2026-11-17, from the 2026-09-11 run logs).** The network
+> ran. Experiment 2b (`--manual-stall`, real quorum loss by stopping besu-3 +
+> besu-4) completed twice: sync healthy ~14.4 s/round, first stalled round
+> 188.9 s, async healthy ~115–136 ms/round; after restore, 6 devices rebuilt
+> from 78 chain events, 0 discrepancies. Experiment 2c preflight (writer and
+> non-writer keys): **18 passed, 1 failed** — `UnauthorizedWriter` was refused
+> by consensus, deploy gas 2,085,425 reproduced exactly, `commitBatch(4)` =
+> 168,069, `classifySigned` = 46,613. **The 1 failure is an open bug:**
+> `head_hash()` raises `ExtraDataLengthError` on Besu's 327-byte POA
+> `extraData` — inject web3's `geth_poa_middleware` in `chain/evm.py` before
+> re-running. 2a (confirmation latency) and 2d (reorg null result) have no
+> archived logs — treat as not yet run. Original banner below is historical.
+
 **These files are untested.** They are standard Besu boilerplate and I am
 reasonably confident in them, but I had no Docker or Besu available, so nothing
 here has been executed end to end. `verify.sh` exists because the two commonest

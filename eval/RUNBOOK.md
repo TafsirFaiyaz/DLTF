@@ -1,5 +1,17 @@
 # DLTF — runbook to a submission-grade paper
 
+> **STATUS NOTE (2026-11-17).** This plan predates the September 2026
+> deployment session. Since it was written: all six "NEW" eval files exist
+> (`exp_aggregator`, `exp_tiers`, `exp_window`, `exp_engine_sweep`,
+> `verify_numbers`, plus `exp_liveness`/`exp_economics`/`exp_commit_gas`);
+> the Foundry rejection-rule suite exists
+> (`contracts/test/DLTFRegistryRules.t.sol` + `DLTFRegistryCommit.t.sol`);
+> local signing, async writes and the QBFT stage ran (root `RUNBOOK.md`,
+> `CLAUDE.md`, `MASTER_CONTEXT.md` §15 — including one open POA-middleware
+> bug). Re-check each phase below against the current tree before ticking;
+> the requirement→test-name table and the falsification methodology remain
+> the authoritative plan for the paper's evidence section.
+
 Everything needed, in dependency order. Tick as you go.
 
 Current state: **17 of 28 requirements** established by measurement; O1 and O4

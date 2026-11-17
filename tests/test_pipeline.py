@@ -41,7 +41,6 @@ COMPILE_ONLY = [        # need torch or tpm2-tools or a CLI: run machine-side
     "fl/model.py",
     "tpm/check_ek_cert.py",
     "eval/run_experiments.py",
-    "eval/plot_results.py",
 ]
 
 # Optional on-chain trust registry. Skipped cleanly when chain/ is absent, so

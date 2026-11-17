@@ -1,7 +1,20 @@
 # DLTF Documentation Index
 
-Eleven documents, all current as of the latest verified run. Start with §1 if
-you are setting up, §2 if you are writing.
+Consolidated 2026-11-17. One canonical version of each document; superseded
+versions are preserved, labeled, in `docs/history/`. Start with §1 if you are
+setting up, §2 if you are writing, §3 if you are running or verifying.
+
+**Root-level canonical docs**
+
+| Document | Read it when |
+|---|---|
+| `README.md` (root) | first contact — what DLTF is, current state, quick start |
+| `MASTER_CONTEXT.md` (root) | **the authoritative system state** — engine constants, chain layer, Sept-2026 deployment phase (§15), merged appendix (§16) |
+| `RUNBOOK.md` (root) | the newest engineering record: local signing, correctness fixes, liveness/economics, QBFT runs (§11) |
+| `CLAUDE.md` (root) | session handoff + ordered next steps (Anvil → testnet → QBFT → paper) |
+| `SETUP_GUIDE.md` (root) | first install, or something broke (13 sections, in break-order) |
+| `FETCH_EK_CERT.md` (root) | provisioning a new AMD client's EK certificate (evergreen) |
+| `REFERENCES.md` (root) | annotated bibliography + novelty vs prior work |
 
 ---
 
@@ -9,120 +22,80 @@ you are setting up, §2 if you are writing.
 
 | Document | Read it when |
 |---|---|
-| **`SETUP_GUIDE.md`** | first install, or something broke |
-| **`FOLDER_STRUCTURE.md`** | placing files, deciding what to delete |
-| **`requirements.txt`** / **`requirements-chain.txt`** | `pip install -r` |
+| `SETUP_GUIDE.md` (root) | install, venv ABI trap, solc pin, TPM certs, Tailscale, real chain (§13) |
+| `SIM_WALKTHROUGH.md` | demoing on one PC — nine steps, each with its proof line |
+| `REAL_MODE_RUNBOOK.md` | the three-machine deployment; **read §0 first** (two physical clients cannot demonstrate detection) |
+| `qbft/README.md` | the 4-validator Besu stage: what it proves, what already ran, the open POA bug |
 
-`SETUP_GUIDE.md` has 12 sections in the order things actually break: system
-packages, venv (with the NumPy ABI trap), Python deps, Solidity toolchain (with
-the solc pin evidence), install verification, SIM, evaluation, Tailscale, TPM
-certs, REAL mode, live node, troubleshooting table.
-
-`FOLDER_STRUCTURE.md` is the full tree with every file tagged NEW / REPLACE /
-yours / ⚠, install commands, and nine decisions you still owe.
-
-## 2. Writing the thesis
+## 2. Writing the thesis / paper
 
 | Document | Read it when |
 |---|---|
-| **`THESIS_CONTEXT.md`** | **start here — writing any chapter** |
-| **`HOW_THE_BLOCKCHAIN_WORKS.md`** | writing Ch. 3 §chain or Ch. 5 |
-| **`MASTER_CONTEXT.md`** | you need the authoritative system state |
-| **`RESULTS_EXPLAINED.md`** | writing Ch. 4 or Ch. 5 numbers |
-| **`GRAPHS_AND_VERIFICATION.md`** | choosing and regenerating figures |
+| `THESIS_CONTEXT.md` | **start here — writing any chapter/section.** §0: eight claims you must not make |
+| `HOW_THE_BLOCKCHAIN_WORKS.md` | the chain design explainer (no-txid argument, semantic-vs-state API, EK privacy); see its 2026 addendum for async/QBFT corrections |
+| `MASTER_CONTEXT.md` (root) | you need the authoritative system state and constants |
+| `RESULTS_EXPLAINED.md` | what each measured number licenses you to claim |
+| `FORGE_LINT_WARNINGS.md` | `forge build` printed unsafe-typecast notes (justified suppression) |
+| `eval/RUNBOOK.md` | the paper-evidence completion plan (28-requirement coverage) |
 
-`THESIS_CONTEXT.md` opens with **§0: eight claims you must not make**, each with
-the defensible rephrasing. Then the problem statement, threat model,
-architecture, the full reputation engine with constant provenance, chain layer,
-measured results, limitations, related-work positioning, and a chapter plan.
-
-`HOW_THE_BLOCKCHAIN_WORKS.md` answers "does the client send a txid?" (no, and
-why that's deliberate), with a live 24-event trace and the semantic-vs-state API
-argument.
-
-`MASTER_CONTEXT.md` is the rewritten version — the one in your repo described
-the **v2.1** engine whose constants no longer exist in the code.
+Two writing tracks exist and their instruction sets must stay separate:
+the **BRACU thesis** (`\hline`-only tables, biblatex-biber; constraints in
+MASTER_CONTEXT §16.11 and `docs/history/LATEX_CHANGES*.md`) and the
+**ACM NSysS paper** (acmart sigconf v2.19, 6–8 pages, booktabs allowed;
+CLAUDE.md §2, `eval/RUNBOOK.md`).
 
 ## 3. Running and verifying
 
 | Document | Read it when |
 |---|---|
-| **`TEST_COMMANDS.md`** | **the master catalogue — 8 tiers** |
-| **`FORGE_LINT_WARNINGS.md`** | `forge build` printed unsafe-typecast notes |
-| **`TIER_0_6_VERIFICATION.md`** | checking your latest run |
-| **`SIM_WALKTHROUGH.md`** | demoing on one PC |
-| **`REAL_MODE_RUNBOOK.md`** | the three-machine deployment |
-
-`TEST_COMMANDS.md` gives every command with what it tests, expected output, what
-it means, and what to do on failure. Plus a `run_all_tests.sh` one-shot script.
-
-`REAL_MODE_RUNBOOK.md` opens with the finding that **two physical clients cannot
-demonstrate detection** — read §0 before attempting the live attack demo.
+| `TEST_COMMANDS.md` | **the master catalogue — 8 tiers**, plus the September suites (preflight, liveness, economics) |
+| `RESULTS_EXPLAINED.md` | interpreting output, negative controls, the three defensible sentences |
+| `FORGE_LINT_WARNINGS.md` | lint output during `forge build` |
 
 ---
 
-## Code delivered
-
-```
-chain/reconcile.py          rebuild ReputationEngine from chain (N23)
-chain/wiring.py             --chain flag -> audit object, + require_commit
-chain/evm.py                live-node backend, layout-agnostic artifacts
-chain/deploy.py             deploy + deployed.json
-chain/verifier.py           REPLACE - knows non-state commitment events
-chain/evm_parity_test.py    REPLACE - layout-agnostic, correct build command
-config.py                   + CHAIN block
-run_local.py                + --chain --restart-at --rejoin-as --tier1 --require-commit
-run_server.py               + --chain, whitewash gate at enrollment
-net/agent.py                + --attack profiles, /bind-wallet, commit hook
-net/handles.py              REPLACE - band fix + commit_agent hook
-tpm/client.py               + sign_message / verify / verify_ak_signature
-eval/chain_eval.py          Chapter 5 harness (6 experiments)
-eval/make_figures.py        REPLACE - FPR assertion fixed
-tests/test_pipeline.py      + 4 chain groups
-tests/test_chain_integration.py   9 groups
-tools/prove_it_works.py     41 checks with negative controls
-contracts/test/DLTFRegistryCommit.t.sol   34 Foundry tests
-contracts/foundry.toml      via_ir = true, solc pinned, lint exclusion documented
-contracts/out/*             prebuilt artifacts, solc 0.8.24
-```
-
----
-
-## Current evidence base
+## Current evidence base (September 2026)
 
 | Artifact | Count |
 |---|---|
-| module self-tests | 274 ✓ across 22 modules |
+| module self-tests | 274 ✓ across 22 modules (July baseline) |
+| contract tests through the signed path | 55/55 (September) |
 | pipeline groups | 8/8 |
 | chain integration groups | 9/9 |
 | falsification checks (with controls) | 41/41 |
-| Python contract parity checks | 53 |
-| Solidity tests | 34 |
-| Chapter 4 CSVs + figures | 6 + 8 |
+| Python contract parity checks | 53 (15 + 17 + 21) |
+| Solidity tests | Rules + Commit suites (`contracts/test/`) |
+| Chapter 4 CSVs + figures | 6 + 8 (regenerated under v3) |
 | Chapter 5 CSVs + figures | 9 + 5 |
+| QBFT preflight (2026-09-11) | 18/19 — **open POA `head_hash` bug**, fix before faucet spend |
 
----
-
-## The five things still open
-
-1. **Tier 7, REAL mode** — three machines. Needs a **third agent**, or detection
-   silently does nothing (measured: n ≥ 3 required for median-based stages).
-2. **Tier 8, live Anvil** — 10 minutes. Cheapest remaining win.
-3. **solc on PATH is 0.5.16** — install 0.8.24 into `~/bin`, or just use
-   `forge build`. Do not upgrade to newest: measured, it moves deploy gas by
-   −49,167 and invalidates your Chapter 5 figure.
-4. **`eval/plot_results.py` is a byte-identical copy of `eval/scenarios.py`** —
-   your own log proved it. Delete it and drop it from `COMPILE_ONLY`.
-5. **Housekeeping** — move v1 chain work to `trust/legacy/`, resolve
-   `chain/reputation.py` vs `trust/reputation.py`, remove `dsadas/`, confirm
-   `run_server.py` exists.
+Canonical result tables: `results/chain/TABLES.md` (generated, regenerable;
+the old `docs/TABLES.md` snapshot was a stale duplicate and was deleted).
 
 ## Numbers to quote carefully
 
 | Quote | Not |
 |---|---|
-| `round_gas ≈ 58,280 + 38,818 × clients` (slope exact, intercept ±5 from calldata) | a single precise intercept |
+| `round_gas ≈ 58,281 + 38,818 × clients` (slope exact, intercept ±5 from calldata) | a single precise intercept |
 | packed word **208 bits declared** | 179 or 181 (varies with `lastRound`) |
 | deploy **2,085,425** at solc 0.8.24 | any figure from another compiler |
 | flag-level FPR 0.6%, **sanction-level 0%** | "zero false positives" |
-| latency from `--exp real` only | SIM py-evm absolutes |
+| latency from `--exp real` only (or the QBFT runs, labeled) | SIM py-evm absolutes |
+| 50-client projection 1,999,181 from the printed fit | 1,999,175 (unrounded coefficients — say which you used) |
+| gas figures labeled with label-length / client-count / path | mixing pre-commitment, 6-client and 4-client signed-path numbers |
+| async liveness numbers **with** backlog collateral | async numbers alone |
+
+## Open items (see MASTER_CONTEXT §14 for the full list)
+
+1. Fix the QBFT POA bug (`geth_poa_middleware` in `chain/evm.py`), re-run preflight.
+2. Anvil with real block time (pending-transaction path never exercised).
+3. Public testnet (Sepolia recommended over Amoy — CLAUDE.md §6 Step 2).
+4. QBFT 2a/2d; REAL-mode detection demo needs a third agent (n ≥ 3).
+5. REFERENCES.md: add Wang 2022, ZTA-FL, Douceur, Theil/Sen, TrustFed; verify
+   [24]; resolve the Kang venue conflict.
+
+## History
+
+`docs/history/README.md` explains every retired document and why it was
+retired. Nothing was deleted without a backup: the full pre-cleanup tree is
+at `D:\DLTF-backup-2026-11-17`, and git history preserves all committed files.
