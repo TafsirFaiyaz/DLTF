@@ -118,6 +118,7 @@ Full setup (venv ABI trap, solc 0.8.24 pin, TPM certs, Tailscale, real chain):
 | **FETCH_EK_CERT.md** | per-machine AMD EK certificate fetch + chain verification |
 | **REFERENCES.md** | annotated bibliography + novelty vs prior work |
 | **docs/INDEX.md** | index of the consolidated docs (thesis context, testing, results, demos) |
+| **docs/ARCHITECTURE.md** | full in-depth architecture breakdown: every layer, data flows, end-to-end walkthroughs |
 | **qbft/README.md** | what the 4-validator stage proves and how to run it |
 | **eval/RUNBOOK.md** | paper-evidence completion plan |
 | **docs/history/** | retired documents, labeled (v2.1 context, executed prompts, LaTeX changelogs, v1 guide) |

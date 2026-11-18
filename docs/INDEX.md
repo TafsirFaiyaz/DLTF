@@ -31,6 +31,7 @@ setting up, §2 if you are writing, §3 if you are running or verifying.
 
 | Document | Read it when |
 |---|---|
+| `ARCHITECTURE.md` | **you want the full picture** — every layer, the exact round lifecycle, data flows, end-to-end walkthroughs (code-grounded, 2026-11-18) |
 | `THESIS_CONTEXT.md` | **start here — writing any chapter/section.** §0: eight claims you must not make |
 | `HOW_THE_BLOCKCHAIN_WORKS.md` | the chain design explainer (no-txid argument, semantic-vs-state API, EK privacy); see its 2026 addendum for async/QBFT corrections |
 | `MASTER_CONTEXT.md` (root) | you need the authoritative system state and constants |
